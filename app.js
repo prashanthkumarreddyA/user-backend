@@ -84,6 +84,7 @@ function authenticateToken(request, response, next) {
         response.status(401);
         response.send("Invalid JWT Token");
       } else {
+        request.username = payload.username;
         next();
       }
     });
@@ -167,17 +168,7 @@ app.get("/prime-deals/", authenticateToken, async (request, response) => {
   const primedeals = await database.all(getPrimeDealsQuery);
   response.send({primedeals});
 });
-/*
-app.get("/products/", authenticateToken, async (request, response) => {
-  const { search_q = "",sort_by="",category="",title_search="",rating="" } = request.query;
-  const getProductssQuery = `
-    SELECT
-      *
-    FROM
-    product ;`;
-  const products = await database.all(getProductssQuery);
-  response.send({products});
-}); */
+
 
 app.get("/products/", authenticateToken, async (request, response) => {
     const {  sort_by = "", category = "", title_search = "", rating = "" } = request.query;
@@ -249,4 +240,87 @@ app.get("/products/:productId/", authenticateToken, async (request, response) =>
   const getSimilarProductQuery = `SELECT * FROM product WHERE category = '${category}' AND id <> ${id} LIMIT 3`;
   const products=await database.all(getSimilarProductQuery);
   response.send({product:product,similar_products:products});
+});
+
+
+app.get("/cart", authenticateToken, async (request, response) => {
+  const { username } = request;
+  const getCartItemsQuery = `
+    SELECT 
+      product.*, cart.quantity
+    FROM 
+      cart
+    INNER JOIN 
+      product ON cart.product_id = product.id
+    WHERE 
+      cart.username = '${username}';`;
+
+  const cartItems = await database.all(getCartItemsQuery);
+  response.send({ cartItems });
+});
+
+app.post("/cart/add", authenticateToken, async (request, response) => {
+  const { username, productId, quantity } = request.body;
+
+  const checkCartItemQuery = `
+    SELECT 
+      *
+    FROM 
+      cart
+    WHERE 
+      username = '${username}' AND product_id = ${productId};`;
+
+  const existingCartItem = await database.get(checkCartItemQuery);
+
+  if (existingCartItem) {
+    // Item already exists in the cart, update the quantity
+    const updateQuantityQuery = `
+      UPDATE 
+        cart
+      SET 
+        quantity = ${existingCartItem.quantity + quantity}
+      WHERE 
+        username = '${username}' AND product_id = ${productId};`;
+
+    await database.run(updateQuantityQuery);
+    response.send("Item quantity updated in the cart");
+  } else {
+    // Item doesn't exist in the cart, add it with the quantity
+    const addToCartQuery = `
+      INSERT INTO 
+        cart (username, product_id, quantity)
+      VALUES
+        ('${username}', ${productId}, ${quantity});`;
+
+    await database.run(addToCartQuery);
+    response.send("Item added to the cart");
+  }
+});
+
+app.delete("/cart/remove", authenticateToken, async (request, response) => {
+  const { username, productId } = request.body;
+
+  const removeFromCartQuery = `
+    DELETE FROM 
+      cart
+    WHERE 
+      username = '${username}' AND product_id = ${productId};`;
+
+  await database.run(removeFromCartQuery);
+  response.send("Item removed from the cart");
+});
+
+app.put("/cart/update", authenticateToken, async (request, response) => {
+  const { username, productId, quantity } = request.body;
+
+  const updateQuantityQuery = `
+    UPDATE 
+      cart
+    SET 
+      quantity = ${quantity}
+    WHERE 
+      username = '${username}' AND product_id = ${productId};`;
+
+  await database.run(updateQuantityQuery);
+  response.send("Item quantity updated in the cart");
 });
