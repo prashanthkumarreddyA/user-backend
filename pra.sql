@@ -1,11 +1,6 @@
-SELECT 
-      product.*, cart.quantity
-    FROM 
-      cart
-    INNER JOIN 
-      product ON cart.product_id = product.id
-    WHERE 
-      cart.username = 'prashanth_reddy';
+INSERT INTO cart ( username, product_id, quantity)
+VALUES ( 'prashanth_reddy', 24, 10);
+
     
 
 

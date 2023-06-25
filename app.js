@@ -99,7 +99,7 @@ app.post("/login", async (request, response) => {
   
   if (databaseUser === undefined) {
     response.status(400);
-    response.send("Invalid user");
+    response.send({"error_msg":"Invalid user"});
   } else {
     const isPasswordMatched = await bcrypt.compare(
       password,
@@ -113,7 +113,7 @@ app.post("/login", async (request, response) => {
       response.send({ jwt_token });
     } else {
       response.status(400);
-      response.send("Invalid password");
+      response.send({"error_msg":"Invalid password"});
     }
   }
 });
@@ -256,12 +256,13 @@ app.get("/cart", authenticateToken, async (request, response) => {
       cart.username = '${username}';`;
 
   const cartItems = await database.all(getCartItemsQuery);
-  response.send({ cartItems });
+  
+  response.send({ cartItems:cartItems });
 });
 
 app.post("/cart/add", authenticateToken, async (request, response) => {
-  const { username, productId, quantity } = request.body;
-
+  const {  productId, quantity } = request.body;
+  const { username } = request;
   const checkCartItemQuery = `
     SELECT 
       *
@@ -297,30 +298,106 @@ app.post("/cart/add", authenticateToken, async (request, response) => {
   }
 });
 
-app.delete("/cart/remove", authenticateToken, async (request, response) => {
-  const { username, productId } = request.body;
+app.delete("/cart/all", authenticateToken, async (request, response) => {
+  const { username} = request;
 
   const removeFromCartQuery = `
     DELETE FROM 
       cart
     WHERE 
-      username = '${username}' AND product_id = ${productId};`;
+      username = '${username}' `;
 
   await database.run(removeFromCartQuery);
   response.send("Item removed from the cart");
 });
 
-app.put("/cart/update", authenticateToken, async (request, response) => {
-  const { username, productId, quantity } = request.body;
+app.delete("/cart/:id", authenticateToken, async (request, response) => {
+  const { username} = request;
+  const { id } = request.params;
+  const removeFromCartQuery = `
+    DELETE FROM 
+      cart
+    WHERE 
+    username = '${username}' and product_id =  ${id};`;
 
+  await database.run(removeFromCartQuery);
+  response.send("Item removed from the cart");
+});
+
+app.put("/cart/add/:productId", authenticateToken, async (request, response) => {
+  const { productId } = request.params;
+  const { username } = request;
+
+  // Get the current quantity from the database
+  const getQuantityQuery = `
+    SELECT 
+      quantity
+    FROM 
+      cart
+    WHERE 
+      username = '${username}' AND product_id = ${productId};`;
+
+  const quantityResult = await database.get(getQuantityQuery);
+  let currentQuantity = quantityResult.quantity;
+
+  // Increment the quantity by 1
+  currentQuantity += 1;
+
+  // Update the quantity in the database
   const updateQuantityQuery = `
     UPDATE 
       cart
     SET 
-      quantity = ${quantity}
+      quantity = ${currentQuantity}
     WHERE 
       username = '${username}' AND product_id = ${productId};`;
 
   await database.run(updateQuantityQuery);
   response.send("Item quantity updated in the cart");
 });
+
+
+app.put("/cart/subtract/:productId", authenticateToken, async (request, response) => {
+  const { productId } = request.params;
+  const { username } = request;
+
+  // Get the current quantity from the database
+  const getQuantityQuery = `
+    SELECT 
+      quantity
+    FROM 
+      cart
+    WHERE 
+      username = '${username}' AND product_id = ${productId};`;
+
+  const quantityResult = await database.get(getQuantityQuery);
+  let currentQuantity = quantityResult.quantity;
+
+  if (currentQuantity === 1) {
+    // Delete the row from the database
+    const deleteRowQuery = `
+      DELETE FROM
+        cart
+      WHERE
+        username = '${username}' AND product_id = ${productId};`;
+
+    await database.run(deleteRowQuery);
+    response.send("Item removed from the cart");
+  } else {
+    // Decrement the quantity by 1
+    currentQuantity -= 1;
+
+    // Update the quantity in the database
+    const updateQuantityQuery = `
+      UPDATE 
+        cart
+      SET 
+        quantity = ${currentQuantity}
+      WHERE 
+        username = '${username}' AND product_id = ${productId};`;
+
+    await database.run(updateQuantityQuery);
+    response.send("Item quantity updated in the cart");
+  }
+});
+
