@@ -160,14 +160,22 @@ app.put("/change-password", async (request, response) => {
 
 
 app.get("/prime-deals/", authenticateToken, async (request, response) => {
-  const getPrimeDealsQuery = `
-    SELECT
-      *
-    FROM
-    primedeals;`;
-  const primedeals = await database.all(getPrimeDealsQuery);
-  response.send({primedeals});
+  const { username } = request;
+  const getPrimeStatusQuery = `
+    SELECT prime FROM user WHERE username = '${username}';`;
+  // Retrieve the user's prime status from the database
+  const user = await database.get(getPrimeStatusQuery);
+  if (user && user.prime) {
+    const getPrimeDealsQuery = `
+      SELECT * FROM primedeals;`;
+    const primeDeals = await database.all(getPrimeDealsQuery);
+
+    response.send({ primeDeals });
+  } else {
+    response.status(401).send("Unauthorized");
+  }
 });
+
 
 
 app.get("/products/", authenticateToken, async (request, response) => {
