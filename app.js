@@ -284,7 +284,7 @@ app.post("/cart/add", authenticateToken, async (request, response) => {
         username = '${username}' AND product_id = ${productId};`;
 
     await database.run(updateQuantityQuery);
-    response.send("Item quantity updated in the cart");
+    response.send({success_msg:"Item quantity updated in the cart"});
   } else {
     // Item doesn't exist in the cart, add it with the quantity
     const addToCartQuery = `
@@ -294,7 +294,7 @@ app.post("/cart/add", authenticateToken, async (request, response) => {
         ('${username}', ${productId}, ${quantity});`;
 
     await database.run(addToCartQuery);
-    response.send("Item added to the cart");
+    response.send({success_msg:"Item added to the cart"});
   }
 });
 
